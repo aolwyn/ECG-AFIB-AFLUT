@@ -144,21 +144,21 @@ def test_signal(signal):
 
 def apply_high_pass_filter(signal, cutoff=0.5, fs=360, order=4, padlen=10):
     """
-    Apply a high-pass filter to remove baseline wander.
-    
+    Apply a high-pass filter to remove low-frequency noise such as baseline wander.
+
     Args:
         signal (np.array): ECG signal, expected to be 1D (samples) or 2D (samples, leads).
-        cutoff (float): Cutoff frequency in Hz.
-        fs (int): Sampling frequency.
-        order (int): Order of the filter.
-        padlen (int): Length of the padding for filtfilt function.
-    
+        cutoff (float): Cutoff frequency in Hz, default is 0.5 Hz.
+        fs (int): Sampling frequency of the ECG signal in Hz, default is 360 Hz.
+        order (int): The order of the filter, default is 4.
+        padlen (int): The padding length used by `filtfilt` to reduce edge effects, default is 10.
+
     Returns:
-        np.array: Filtered signal with the same shape as input.
+        np.array: Filtered ECG signal with the same shape as the input.
+
+    Note:
+        If the signal is 2D, the filter is applied independently to each lead.
     """
-    # Ensure signal is a NumPy array
-    signal = np.array(signal)
-    
     nyquist = 0.5 * fs
     normal_cutoff = cutoff / nyquist
     b, a = butter(order, normal_cutoff, btype='high', analog=False)
@@ -166,7 +166,6 @@ def apply_high_pass_filter(signal, cutoff=0.5, fs=360, order=4, padlen=10):
     if signal.ndim == 1:
         return filtfilt(b, a, signal, padlen=padlen)
     else:
-        # Multi-lead case: apply filter independently to each lead
         filtered_signal = np.zeros_like(signal)
         for lead in range(signal.shape[1]):
             filtered_signal[:, lead] = filtfilt(b, a, signal[:, lead], padlen=padlen)
@@ -176,16 +175,20 @@ def apply_high_pass_filter(signal, cutoff=0.5, fs=360, order=4, padlen=10):
 
 def apply_notch_filter(signal, notch_freq=60, fs=360, quality_factor=30):
     """
-    Apply a notch filter to remove powerline interference.
-    
+    Apply a notch filter to remove powerline interference at a specified frequency.
+
     Args:
         signal (np.array): ECG signal, expected to be 1D (samples) or 2D (samples, leads).
-        notch_freq (float): Frequency to notch out (e.g., 50 or 60 Hz).
-        fs (int): Sampling frequency.
-        quality_factor (float): Quality factor of the notch filter.
-    
+        notch_freq (float): Frequency to be notched out (e.g., 50 or 60 Hz), default is 60 Hz.
+        fs (int): Sampling frequency of the ECG signal in Hz, default is 360 Hz.
+        quality_factor (float): Quality factor of the notch filter, default is 30.
+                               A higher quality factor gives a narrower notch.
+
     Returns:
-        np.array: Filtered signal with the same shape as input.
+        np.array: Filtered ECG signal with the same shape as the input.
+
+    Note:
+        If the signal is 2D, the filter is applied independently to each lead.
     """
     nyquist = 0.5 * fs
     w0 = notch_freq / nyquist
@@ -203,16 +206,19 @@ def apply_notch_filter(signal, notch_freq=60, fs=360, quality_factor=30):
 
 def apply_low_pass_filter(signal, cutoff=40, fs=360, order=4):
     """
-    Apply a low-pass filter to remove high-frequency noise.
-    
+    Apply a low-pass filter to remove high-frequency noise from the ECG signal.
+
     Args:
         signal (np.array): ECG signal, expected to be 1D (samples) or 2D (samples, leads).
-        cutoff (float): Cutoff frequency in Hz.
-        fs (int): Sampling frequency.
-        order (int): Order of the filter.
-    
+        cutoff (float): Cutoff frequency in Hz, default is 40 Hz.
+        fs (int): Sampling frequency of the ECG signal in Hz, default is 360 Hz.
+        order (int): The order of the filter, default is 4.
+
     Returns:
-        np.array: Filtered signal with the same shape as input.
+        np.array: Filtered ECG signal with the same shape as the input.
+
+    Note:
+        If the signal is 2D, the filter is applied independently to each lead.
     """
     nyquist = 0.5 * fs
     normal_cutoff = cutoff / nyquist
@@ -230,15 +236,22 @@ def apply_low_pass_filter(signal, cutoff=40, fs=360, order=4):
 
 def apply_moving_average_filter(signal, window_size=5):
     """
-    Apply a moving average filter to smooth remaining noise for each lead in a multi-lead ECG signal.
-    
+    Apply a moving average filter to smooth the ECG signal by reducing high-frequency noise.
+
     Args:
         signal (np.array): ECG signal, expected to be 1D (samples) or 2D (samples, leads).
-        window_size (int): Number of samples for the moving average window.
-    
+        window_size (int): Number of samples for the moving average window, default is 5.
+
     Returns:
-        np.array: Smoothed signal with the same shape as input.
+        np.array: Smoothed ECG signal with the same shape as the input.
+
+    Note:
+        If the signal is 2D, the filter is applied independently to each lead.
+        The window size should be chosen based on the sampling frequency and desired smoothing level.
     """
+    # Ensure signal is a NumPy array
+    signal = np.array(signal)
+    
     if signal.ndim == 1:
         return np.convolve(signal, np.ones(window_size) / window_size, mode='same')
     else:
@@ -248,80 +261,92 @@ def apply_moving_average_filter(signal, window_size=5):
         return smoothed_signal
 
 
+
 ##
 
-def normalize_signal(signal):
+def normalize_signal_0_to_1(signal):
     """
-    Normalize the ECG signal between 0 and 1 using min-max scaling.
-    
+    Normalize the ECG signal values between 0 and 1 using min-max scaling.
+
     Args:
         signal (np.array): ECG signal, expected to be 1D (samples) or 2D (samples, leads).
-    
+
     Returns:
-        np.array: Normalized signal with the same shape as input.
+        np.array: Normalized ECG signal with values between 0 and 1, with the same shape as the input.
+
+    Note:
+        If the signal is multi-lead (2D), each lead is normalized independently.
     """
+    # Ensure signal is a NumPy array
+    signal = np.array(signal)
+    
     if signal.ndim == 1:
-        return (signal - np.min(signal)) / (np.max(signal) - np.min(signal))
+        # Min-max normalization for 1D signal
+        min_val, max_val = signal.min(), signal.max()
+        if max_val - min_val != 0:
+            return (signal - min_val) / (max_val - min_val)
+        else:
+            return np.zeros_like(signal)  # If the signal is constant, return zero array
     else:
+        # Min-max normalization for each lead in multi-lead signals
         normalized_signal = np.zeros_like(signal)
         for lead in range(signal.shape[1]):
-            normalized_signal[:, lead] = (signal[:, lead] - np.min(signal[:, lead])) / (np.max(signal[:, lead]) - np.min(signal[:, lead]))
+            min_val, max_val = signal[:, lead].min(), signal[:, lead].max()
+            if max_val - min_val != 0:
+                normalized_signal[:, lead] = (signal[:, lead] - min_val) / (max_val - min_val)
+            else:
+                normalized_signal[:, lead] = np.zeros(signal.shape[0])  # Zero array if constant
         return normalized_signal
 
 ##
 
-def apply_filters_to_all_patients(all_data, fs=360):
+def apply_filters_and_normalization(patient_data, fs=360):
     """
-    Apply high-pass, notch, low-pass, moving average filters, and normalization to each patient's ECG data.
-    
+    Apply high-pass, notch, low-pass, moving average filters, and normalization to each lead
+    in each beat for all patients in patient_data, with progress updates.
+
     Args:
-        all_data (dict): Dictionary where each key is a patient ID and each value is the ECG signal.
-        fs (int): Sampling frequency of the ECG signals.
-    
+        patient_data (dict): Dictionary containing ECG data for all patients.
+        fs (int): Sampling frequency of the ECG signals, default is 360 Hz.
+
     Returns:
-        dict: Dictionary with the same keys as `all_data`, where each value is the fully preprocessed ECG signal.
+        dict: Processed patient_data with filtered and normalized signals.
     """
-    processed_data = {}
+    # Define filter parameters
+    high_pass_cutoff = 0.5   # Hz, for removing baseline wander
+    notch_freq = 60          # Hz, for removing powerline interference
+    low_pass_cutoff = 40     # Hz, for removing high-frequency noise
+    moving_average_window = 5 # Window size for smoothing
     
-    # Filter parameters
-    high_pass_cutoff = 0.5
-    notch_freq = 60
-    low_pass_cutoff = 40
-    window_size = 5  # For moving average filter
-
-    for patient_id, signal in all_data.items():
-        print(f"\nProcessing data for patient {patient_id}")
+    for patient_id, beats in patient_data.items():
+        for beat in beats:
+            for lead_key in beat.keys():
+                if lead_key.startswith('signal_lead_'):
+                    # Apply high-pass filter
+                    beat[lead_key] = apply_high_pass_filter(
+                        beat[lead_key], cutoff=high_pass_cutoff, fs=fs
+                    )
+                    
+                    # Apply notch filter
+                    beat[lead_key] = apply_notch_filter(
+                        beat[lead_key], notch_freq=notch_freq, fs=fs
+                    )
+                    
+                    # Apply low-pass filter
+                    beat[lead_key] = apply_low_pass_filter(
+                        beat[lead_key], cutoff=low_pass_cutoff, fs=fs
+                    )
+                    
+                    # Apply moving average filter
+                    beat[lead_key] = apply_moving_average_filter(
+                        beat[lead_key], window_size=moving_average_window
+                    )
+                    
+                    # Apply normalization to 0-1 range
+                    beat[lead_key] = normalize_signal_0_to_1(beat[lead_key])
         
-        # Ensure signal is a NumPy array and print initial shape and type
-        signal = np.array(signal)
-        print(f"Initial signal shape: {signal.shape}, type: {type(signal)}")
-        
-        # Step 1: Apply high-pass filter
-        try:
-            signal = apply_high_pass_filter(signal, cutoff=high_pass_cutoff, fs=fs)
-            print(f"After high-pass filter: {signal.shape}, type: {type(signal)}")
-        except ValueError as e:
-            print(f"Skipping high-pass filter for patient {patient_id}: {e}")
-            continue
-        
-        # Step 2: Apply notch filter
-        signal = apply_notch_filter(signal, notch_freq=notch_freq, fs=fs)
-        print(f"After notch filter: {signal.shape}, type: {type(signal)}")
-        
-        # Step 3: Apply low-pass filter
-        signal = apply_low_pass_filter(signal, cutoff=low_pass_cutoff, fs=fs)
-        print(f"After low-pass filter: {signal.shape}, type: {type(signal)}")
-        
-        # Step 4: Apply moving average filter
-        signal = apply_moving_average_filter(signal, window_size=window_size)
-        print(f"After moving average filter: {signal.shape}, type: {type(signal)}")
-        
-        # Step 5: Normalize signal between 0 and 1
-        signal = normalize_signal(signal)
-        print(f"After normalization: {signal.shape}, type: {type(signal)}")
-        
-        # Store the processed signal
-        processed_data[patient_id] = signal
-
-    return processed_data
+        # Print a progress update for each patient
+        print(f"Processing complete for patient {patient_id}")
+    
+    return patient_data
 ##
