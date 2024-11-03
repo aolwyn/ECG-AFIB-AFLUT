@@ -126,6 +126,20 @@ def calculate_rr_intervals(signal_data, fs=360):
 
     return rr_intervals
 
+## Test Signal
+
+def test_signal(signal):
+    # test normalization between -1 and 1.
+    min_val, max_val = signal.min(), signal.max()
+    # print("lowest value:",min_val)
+    
+    if max_val - min_val != 0:
+        signal = 2 * (signal - min_val) / (max_val - min_val) - 1
+    return signal
+
+
+
+
 ## FILTERS YAY
 
 def apply_high_pass_filter(signal, cutoff=0.5, fs=360, order=4, padlen=10):
@@ -213,7 +227,6 @@ def apply_low_pass_filter(signal, cutoff=40, fs=360, order=4):
         return filtered_signal
 
 ##
-
 
 def apply_moving_average_filter(signal, window_size=5):
     """
