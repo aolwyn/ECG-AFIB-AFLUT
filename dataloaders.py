@@ -1,6 +1,10 @@
 import os
-import wfdb
+import wfdb 
+from wfdb import processing
 import torch
+import numpy as np
+from scipy.signal import decimate, find_peaks, resample 
+import matplotlib.pyplot as plt
 
 # Define a dictionary for mapping MIT-BIH annotations to classes
 LABEL_MAPPING = {
@@ -64,10 +68,26 @@ def load_record(record_path):
         tuple: Tuple of (signal, annotations), where signal is a 2D numpy array
                of the ECG signal, and annotations are the WFDB annotation object.
     """
+    # Load the ECG record and annotations
     record = wfdb.rdrecord(record_path)
     annotations = wfdb.rdann(record_path, 'atr')
     signal = record.p_signal  # Extract the ECG signal
-    return signal, annotations
+
+    # Define original and target sampling rates as integers
+    original_fs = int(360)
+    target_fs = int(250)
+
+    # Downsample signal and annotations together using wfdb.processing.resample_multichan
+    downsampled_signal, annotations = processing.resample_multichan(
+        signal,
+        annotations,  # Pass annotation sample indices for downsampling
+        original_fs,
+        target_fs
+    )
+
+    return downsampled_signal, annotations
+
+
 
 def load_ecg_data(record_path):
     """
@@ -82,6 +102,8 @@ def load_ecg_data(record_path):
     """
     record = wfdb.rdrecord(record_path)
     annotation = wfdb.rdann(record_path, 'atr')
+
+    
     return record, annotation
 
 ##

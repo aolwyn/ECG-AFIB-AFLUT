@@ -2,15 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from dataloaders import load_record 
 
-def visualize_ecg_with_labels(signal, annotations, fs=360, duration=10):
+def visualize_ecg_with_labels(signal, annotations, fs=250, duration=10):
     """
     Visualize ECG signal with arrhythmia labels. 
     
-    USE CASE IS FOR DIRECTLY USING THE WFDB OBJ.
-    
     Args:
         signal (np.array): ECG signal, typically 2D (samples, channels).
-        annotations: WFDB annotations for arrhythmias.
+        annotations (np.array): Indices of arrhythmias.
+        symbols (list or np.array): Corresponding symbols for each annotation.
         fs (int): Sampling frequency.
         duration (int): Duration (seconds) to visualize.
     """
@@ -38,7 +37,7 @@ def visualize_ecg_with_labels(signal, annotations, fs=360, duration=10):
     plt.show()
 
 ##
-def visualize_ecg_with_annotationsV2(patient_data, patient_id, num_beats=5, fs=360):
+def visualize_ecg_with_annotationsV2(patient_data, patient_id, num_beats=5, fs=250):
     """
     Visualizes a sequence of ECG beats for a specific patient on a single plot,
     with annotations indicating each beat's type, adjusted for sample offset.
