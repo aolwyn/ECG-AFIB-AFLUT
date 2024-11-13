@@ -8,9 +8,9 @@ import matplotlib.pyplot as plt
 
 # Define a dictionary for mapping MIT-BIH annotations to classes
 LABEL_MAPPING = {
-    'N': 'normal',  # Normal beat
-    'AFIB': 'atrial_fibrillation',
-    'AFL': 'atrial_flutter',
+    '(N': 'normal',  # Normal beat
+    '(AFIB': 'atrial_fibrillation',
+    '(AFL': 'atrial_flutter',
     # Add other relevant mappings if needed
 }
 
@@ -118,13 +118,38 @@ def get_labels(annotation):
     Returns:
         list: List of labels mapped from annotation symbols.
     """
-    labels = []
-    for symbol in annotation.symbol:
-        if symbol in LABEL_MAPPING:
-            labels.append(LABEL_MAPPING[symbol])
+    # labels = []
+    # for symbol in annotation.symbol:
+    #     if symbol in LABEL_MAPPING:
+    #         labels.append(LABEL_MAPPING[symbol])
+    #     else:
+    #         #labels.append('other')  # Handle other labels as 'other'
+    #         print(symbol)
+    # return labels
+
+    """
+    Extract rhythm annotations from the 'aux_note' field in the annotation object, 
+    removing any unwanted trailing characters.
+    
+    Parameters:
+        annotation (wfdb.Annotation): Annotation object containing beat and rhythm annotations.
+    
+    Returns:
+        list: List of cleaned rhythm types found in aux_note, or 'Unknown' if no rhythm information.
+    """
+    rhythms = []
+    for aux in annotation.aux_note:
+        # Remove the last character if it's a null or unwanted character
+        cleaned_aux = aux.rstrip('\x00')  # Remove null character or any trailing whitespace
+        
+        if cleaned_aux in LABEL_MAPPING:
+            rhythms.append(LABEL_MAPPING[cleaned_aux])
+        elif cleaned_aux:  # If there is a cleaned aux_note and it's not mapped
+            #print(f"Unmapped rhythm found: {cleaned_aux}")
+            rhythms.append(cleaned_aux)  # Append the original, cleaned rhythm type
         else:
-            labels.append('other')  # Handle other labels as 'other'
-    return labels
+            rhythms.append('Unknown')  # Use 'Unknown' if no aux_note is available
+    return rhythms
 
 ##
 

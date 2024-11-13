@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from dataloaders import load_record 
+from scipy.signal import decimate
 
 def visualize_ecg_with_labels(signal, annotations, fs=250, duration=10):
     """
@@ -37,16 +38,17 @@ def visualize_ecg_with_labels(signal, annotations, fs=250, duration=10):
     plt.show()
 
 ##
-def visualize_ecg_with_annotationsV2(patient_data, patient_id, num_beats=5, fs=250):
+def visualize_ecg_with_annotationsV2(patient_data, patient_id, num_beats=5, original_fs=360, target_fs=250):
     """
-    Visualizes a sequence of ECG beats for a specific patient on a single plot,
+    Visualizes a sequence of downsampled ECG beats for a specific patient on a single plot,
     with annotations indicating each beat's type, adjusted for sample offset.
 
     Parameters:
         patient_data (dict): Dictionary containing ECG data for all patients.
         patient_id (str): The ID of the patient to visualize.
         num_beats (int): The number of beats to visualize.
-        fs (int): Sampling frequency in Hz, default is 360.
+        original_fs (int): Original sampling frequency in Hz, default is 360.
+        target_fs (int): Target downsampled frequency in Hz, default is 250.
     """
     # Check if the patient_id exists in the data
     if patient_id not in patient_data:
@@ -58,6 +60,9 @@ def visualize_ecg_with_annotationsV2(patient_data, patient_id, num_beats=5, fs=2
     # Limit the number of beats to visualize based on available data
     num_beats = min(num_beats, len(beats))
     
+    # Downsampling factor
+    downsample_factor = original_fs // target_fs
+    
     # Initialize plot
     plt.figure(figsize=(15, 6))
     
@@ -67,21 +72,22 @@ def visualize_ecg_with_annotationsV2(patient_data, patient_id, num_beats=5, fs=2
         all_segments = []
         annotations = []
         
-        # Gather signal segments and annotations for each beat
+        # Gather downsampled signal segments and annotations for each beat
         for i in range(num_beats):
             beat = beats[i]
-            segment = beat[lead_key]
+            # Downsample the signal segment
+            segment = decimate(beat[lead_key], downsample_factor)
             segment_length = len(segment)
             midpoint_offset = segment_length // 2  # Center of each beat
             
-            # Append the segment to the continuous signal
+            # Append the downsampled segment to the continuous signal
             all_segments.extend(segment)
             
             # Calculate annotation position with offset adjustment
             annotation_position = len(all_segments) - midpoint_offset
             annotations.append((annotation_position, beat['label']))
         
-        # Plot concatenated signals for this lead
+        # Plot concatenated downsampled signals for this lead
         plt.plot(all_segments, label=lead_key)
         
         # Add annotations
