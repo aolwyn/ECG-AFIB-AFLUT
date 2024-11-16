@@ -144,12 +144,10 @@ def get_labels(annotation):
         
         if cleaned_aux in LABEL_MAPPING:
             rhythms.append(LABEL_MAPPING[cleaned_aux])
-        elif cleaned_aux:  # If there is a cleaned aux_note and it's not mapped
-            #print(f"Unmapped rhythm found: {cleaned_aux}")
-            rhythms.append(cleaned_aux)  # Append the original, cleaned rhythm type
-        else:
-            rhythms.append('Unknown')  # Use 'Unknown' if no aux_note is available
+        else:  # If there is a cleaned aux_note and it's not mapped
+            rhythms.append('Other')  # Append 'Other' for unmapped rhythm types
     return rhythms
+
 
 ##
 
