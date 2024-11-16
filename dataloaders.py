@@ -82,6 +82,7 @@ def load_ecg_data(record_path):
     """
     record = wfdb.rdrecord(record_path)
     annotation = wfdb.rdann(record_path, 'atr')
+    
     return record, annotation
 
 ##
