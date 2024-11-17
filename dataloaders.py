@@ -164,9 +164,6 @@ def get_labels(annotation):
 
 
 ##
-
-from wfdb import processing
-
 def load_all_records(data_dir):
     """
     Load ECG data and annotations for all records in the given directory,
@@ -240,3 +237,35 @@ def load_all_records(data_dir):
             print("done patient: "+record_path)
     
     return all_data
+
+##
+import torch
+from torch.utils.data import Dataset, DataLoader
+
+class ECGDataset(Dataset):
+    """
+    PyTorch Dataset for ECG data.
+    """
+    def __init__(self, signals, labels):
+        self.signals = torch.tensor(signals, dtype=torch.float32)
+        self.labels = torch.tensor(labels, dtype=torch.long)
+
+    def __len__(self):
+        return len(self.signals)
+
+    def __getitem__(self, idx):
+        return self.signals[idx], self.labels[idx]
+
+def create_dataloaders(data_splits, batch_size=32):
+    """
+    Create PyTorch DataLoaders for training, validation, and test sets.
+    """
+    train_dataset = ECGDataset(*data_splits['train'])
+    val_dataset = ECGDataset(*data_splits['val'])
+    test_dataset = ECGDataset(*data_splits['test'])
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+    return train_loader, val_loader, test_loader

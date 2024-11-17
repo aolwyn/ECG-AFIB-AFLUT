@@ -1,14 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from dataloaders import load_record 
-from scipy.signal import decimate
+from scipy.signal import decimate, welch
+from scipy.stats import entropy, pearsonr
 from collections import Counter
 import pandas as pd
 
 def visualize_ecg_with_labels(signal, annotations, fs=250, duration=10):
     """
     Visualize ECG signal with arrhythmia labels. 
-    
+    NOTE OUTDATED. FOR USE WITH EDA
     Args:
         signal (np.array): ECG signal, typically 2D (samples, channels).
         annotations (np.array): Indices of arrhythmias.
@@ -44,6 +45,8 @@ def visualize_ecg_with_annotationsV2(patient_data, patient_id, num_beats=5, orig
     """
     Visualizes a sequence of downsampled ECG beats for a specific patient on a single plot,
     with annotations indicating each beat's type, adjusted for sample offset.
+
+    NOTE OUTDATED. FOR USE WITH EDA
 
     Parameters:
         patient_data (dict): Dictionary containing ECG data for all patients.
@@ -107,115 +110,243 @@ def visualize_ecg_with_annotationsV2(patient_data, patient_id, num_beats=5, orig
     plt.show()
 
 ## 
-def visualize_ecg(patient_data, patient_id, num_beats=5):
+def visualize_patient_data(processed_data, patient_id, display_seconds, fs=250):
     """
-    Visualizes the ECG signal segments for a specific patient. Shows on DIFFERENT graphs.
+    Visualize the processed ECG signal for a given patient and duration.
 
-    Parameters:
-        patient_data (dict): Dictionary containing ECG data for all patients.
-        patient_id (str): The ID of the patient to visualize.
-        num_beats (int): The number of beats to visualize.
+    Args:
+        processed_data (dict): Dictionary containing PROCESSED ECG data for all patients.
+        patient_id (str): The patient ID to visualize.
+        display_seconds (int): Number of seconds of data to display.
+        fs (int): Sampling frequency of the ECG signals, default is 250 Hz.
+
+    Returns:
+        None
     """
-    # Check if the patient_id exists in the data
-    if patient_id not in patient_data:
-        print(f"Patient ID {patient_id} not found in data.")
+    # Check if the patient ID exists in the processed data
+    if patient_id not in processed_data:
+        print(f"Patient ID {patient_id} not found in processed data.")
         return
-    
-    beats = patient_data[patient_id]
-    
-    # Limit the number of beats to visualize based on available data
-    num_beats = min(num_beats, len(beats))
-    
-    # Plot each beat's leads as a subplot
-    plt.figure(figsize=(10, 2 * num_beats))
-    
-    for i in range(num_beats):
-        beat = beats[i]
-        
-        # Plot each lead in separate subplots
-        for lead_key in [key for key in beat.keys() if key.startswith('signal_lead_')]:
-            plt.subplot(num_beats, len([k for k in beat.keys() if k.startswith('signal_lead_')]), i * len([k for k in beat.keys() if k.startswith('signal_lead_')]) + int(lead_key[-1]))
-            
-            # Plot the signal segment for this lead
-            plt.plot(beat[lead_key])
-            plt.title(f'Beat {i+1} - {lead_key}')
-            plt.xlabel('Sample')
-            plt.ylabel('Amplitude')
-    
+
+    # Extract the patient's data
+    patient_data = processed_data[patient_id]
+
+    # Determine the number of samples to display
+    samples_to_display = display_seconds * fs
+
+    # Extract signals for the specified duration
+    signals_lead_1 = patient_data['signals_lead_1'][:samples_to_display]
+    signals_lead_2 = patient_data['signals_lead_2'][:samples_to_display]
+
+    # Generate time axis
+    time_axis = [i / fs for i in range(len(signals_lead_1))]
+
+    # Plot the signals
+    plt.figure(figsize=(15, 6))
+
+    plt.subplot(2, 1, 1)
+    plt.plot(time_axis, signals_lead_1, label='Lead 1')
+    plt.title(f"Patient {patient_id} - Lead 1")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude")
+    plt.grid(True)
+    plt.legend()
+
+    plt.subplot(2, 1, 2)
+    plt.plot(time_axis, signals_lead_2, label='Lead 2', color='orange')
+    plt.title(f"Patient {patient_id} - Lead 2")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude")
+    plt.grid(True)
+    plt.legend()
+
     plt.tight_layout()
     plt.show()
 
 ##
-def summarize_rhythm_counts(patient_data, patient_id):
+def visualize_patient_data_with_rhythm(processed_data, patient_id, display_seconds, fs=250):
     """
-    Summarize the number of beats of each rhythm type for a given patient.
+    Visualize the processed ECG signal for a given patient and duration, with rhythm annotations.
 
-    Parameters:
-        patient_data (dict): Dictionary containing ECG data for all patients.
-        patient_id (str): ID of the patient to summarize.
+    Args:
+        processed_data (dict): Dictionary containing processed ECG data for all patients.
+        patient_id (str): The patient ID to visualize.
+        display_seconds (int): Number of seconds of data to display.
+        fs (int): Sampling frequency of the ECG signals, default is 250 Hz.
 
-    Returns:
-        None: Prints a table summarizing the counts of beats for each rhythm type.
-    """
-    # Check if patient exists in the dataset
-    if patient_id not in patient_data:
-        print(f"Patient ID {patient_id} not found in the dataset.")
-        return
-
-    # Extract rhythm labels for the patient
-    rhythm_labels = [entry['label'] for entry in patient_data[patient_id]]
-
-    # Count occurrences of each rhythm type
-    rhythm_counts = Counter(rhythm_labels)
-
-    # Create a DataFrame for better visualization
-    df = pd.DataFrame(list(rhythm_counts.items()), columns=["Rhythm Type", "Count"])
-    df.sort_values(by="Count", ascending=False, inplace=True)
-
-    # Print the summary table
-    print(f"\nSummary of Rhythm Counts for Patient {patient_id}:\n")
-    print(df.to_string(index=False))
-
-
-## 
-def visualize_ecgV3(patient_data, patient_id, num_entries=10):
-    """
-    Visualize ECG signal segments for a specific patient.
-
-    Parameters:
-        patient_data (dict): Dictionary containing ECG data for all patients.
-        patient_id (str): ID of the patient to visualize.
-        num_entries (int): Number of entries (segments) to visualize.
-    
     Returns:
         None
     """
-    # Check if the patient exists in the data
-    if patient_id not in patient_data:
-        print(f"Patient ID {patient_id} not found in data.")
+    # Check if the patient ID exists in the processed data
+    if patient_id not in processed_data:
+        print(f"Patient ID {patient_id} not found in processed data.")
         return
 
-    entries = patient_data[patient_id]
+    # Extract the patient's data
+    patient_data = processed_data[patient_id]
 
-    # Limit the number of entries to visualize
-    num_entries = min(num_entries, len(entries))
+    # Determine the number of samples to display
+    samples_to_display = display_seconds * fs
 
-    # Create a figure with subplots
-    fig, axes = plt.subplots(num_entries, 1, figsize=(12, 4 * num_entries), sharex=True)
+    # Extract signals for the specified duration
+    signals_lead_1 = patient_data['signals_lead_1'][:samples_to_display]
+    signals_lead_2 = patient_data['signals_lead_2'][:samples_to_display]
+    labels = patient_data['labels'][:samples_to_display]
 
-    # Iterate over the entries to plot their signal segments
-    for i in range(num_entries):
-        entry = entries[i]
-        ax = axes[i] if num_entries > 1 else axes  # Support single subplot case
+    # Generate time axis
+    time_axis = [i / fs for i in range(len(signals_lead_1))]
 
-        for lead_key in [key for key in entry.keys() if key.startswith("signal_lead_")]:
-            ax.plot(entry[lead_key], label=lead_key)
+    # Determine rhythm annotations for segments
+    segment_length = fs  # 1-second segments for simplicity
+    num_segments = len(signals_lead_1) // segment_length
+    segment_annotations = []
 
-        ax.set_title(f"Entry {i+1} - Label: {entry['label']}")
-        ax.set_ylabel("Amplitude")
-        ax.legend()
+    for i in range(num_segments):
+        start_idx = i * segment_length
+        end_idx = start_idx + segment_length
+        segment_labels = labels[start_idx:end_idx]
 
-    plt.xlabel("Samples")
-    plt.suptitle(f"ECG Visualization for Patient {patient_id} - First {num_entries} Entries", y=1.02, fontsize=14)
+        # Find the majority label in the segment
+        majority_label = Counter(segment_labels).most_common(1)[0][0]
+        segment_annotations.append((start_idx + segment_length // 2, majority_label))
+
+    # Plot the signals
+    plt.figure(figsize=(15, 6))
+
+    plt.subplot(2, 1, 1)
+    plt.plot(time_axis, signals_lead_1, label='Lead 1')
+    plt.title(f"Patient {patient_id} - Lead 1 with Rhythm Annotations")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude")
+    plt.grid(True)
+    plt.legend()
+
+    # Add rhythm annotations for Lead 1
+    for midpoint, rhythm in segment_annotations:
+        time = midpoint / fs
+        amplitude = signals_lead_1[midpoint]
+        plt.text(time, amplitude, rhythm, fontsize=10, color='red', ha='center')
+
+    plt.subplot(2, 1, 2)
+    plt.plot(time_axis, signals_lead_2, label='Lead 2', color='orange')
+    plt.title(f"Patient {patient_id} - Lead 2")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude")
+    plt.grid(True)
+    plt.legend()
+
     plt.tight_layout()
     plt.show()
+
+
+##
+#NOISE AND ARTIFACTS
+def compute_noise_metrics_for_patient(processed_data, patient_id, fs=250, weights=None):
+    """
+    Compute noise and artifact metrics for each lead of a patient's ECG data
+    and determine which lead is better based on a scoring system.
+
+    Args:
+        processed_data (dict): Dictionary containing processed ECG data for all patients.
+        patient_id (str): The patient ID to analyze.
+        fs (int): Sampling frequency, default is 250 Hz.
+        weights (list): Weights for each metric [SNR, Entropy, Std Dev, HighFreqPower].
+
+    Returns:
+        str: 'Lead 1' or 'Lead 2' based on the scoring system.
+    """
+    if patient_id not in processed_data:
+        print(f"Patient ID {patient_id} not found in processed data.")
+        return None
+
+    # Default weights for scoring (prioritize SNR)
+    if weights is None:
+        weights = [0.4, 0.2, 0.2, 0.2]  # Default: prioritize SNR, almost every paper does this
+
+    # Extract signals for the patient
+    signals_lead_1 = processed_data[patient_id]['signals_lead_1']
+    signals_lead_2 = processed_data[patient_id]['signals_lead_2']
+
+    # Compute metrics for each lead
+    metrics_lead_1 = compute_noise_metrics(signals_lead_1, fs)
+    metrics_lead_2 = compute_noise_metrics(signals_lead_2, fs)
+
+    # NOTE: COMMENT OUT THE BELOW IF DONT WANT ALL METRIC COMPUTATIONS PRINTED (SNR, ENTROPY, HF POWER, STD NORMALIZ)
+    # print(metrics_lead_1)
+    # print(metrics_lead_2)
+
+    # Extract individual metrics
+    snr_1, entropy_1, std_1, hf_power_1 = metrics_lead_1.values()
+    snr_2, entropy_2, std_2, hf_power_2 = metrics_lead_2.values()
+
+    # Normalize metrics
+    snr_norm_1 = snr_1 / max(snr_1, snr_2)
+    snr_norm_2 = snr_2 / max(snr_1, snr_2)
+
+    entropy_norm_1 = entropy_1 / max(entropy_1, entropy_2)
+    entropy_norm_2 = entropy_2 / max(entropy_1, entropy_2)
+
+    std_norm_1 = std_1 / max(std_1, std_2)
+    std_norm_2 = std_2 / max(std_1, std_2)
+
+    hf_power_norm_1 = hf_power_1 / max(hf_power_1, hf_power_2)
+    hf_power_norm_2 = hf_power_2 / max(hf_power_1, hf_power_2)
+
+    # Compute scores for each lead
+    score_lead_1 = (
+        weights[0] * snr_norm_1 +
+        weights[1] * (1 - entropy_norm_1) +
+        weights[2] * (1 - std_norm_1) +
+        weights[3] * (1 - hf_power_norm_1)
+    )
+
+    score_lead_2 = (
+        weights[0] * snr_norm_2 +
+        weights[1] * (1 - entropy_norm_2) +
+        weights[2] * (1 - std_norm_2) +
+        weights[3] * (1 - hf_power_norm_2)
+    )
+
+    # Determine the better lead
+    # print(score_lead_1, score_lead_2)
+    better_lead = 'Lead 1' if score_lead_1 > score_lead_2 else 'Lead 2'
+
+    return better_lead
+
+
+
+def compute_noise_metrics(signal, fs=250):
+    """
+    Compute noise and artifact metrics for a given ECG signal.
+
+    Args:
+        signal (array): ECG signal array (1D).
+        fs (int): Sampling frequency, default is 250 Hz.
+
+    Returns:
+        dict: Dictionary of noise metrics.
+    """
+    # Signal-to-Noise Ratio (SNR)
+    power_signal = np.mean(signal ** 2)
+    noise_band = signal - np.mean(signal)  # Remove baseline
+    power_noise = np.mean(noise_band ** 2)
+    snr = 10 * np.log10(power_signal / power_noise)
+
+    # Entropy
+    signal_entropy = entropy(np.histogram(signal, bins=50, density=True)[0])
+
+    # Standard Deviation
+    std_dev = np.std(signal)
+
+    # Power in Noise Bands (>50 Hz)
+    freqs, psd = welch(signal, fs=fs, nperseg=1024)
+    high_freq_power = np.sum(psd[freqs > 50])
+
+    return {
+        'SNR': snr,
+        'Entropy': signal_entropy,
+        'Standard Deviation': std_dev,
+        'High Frequency Power': high_freq_power,
+    }
+
+##

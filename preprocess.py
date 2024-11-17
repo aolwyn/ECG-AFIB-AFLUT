@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.signal import butter, filtfilt, iirnotch
-
+from collections import defaultdict
 def check_for_missing_values(patient_data):
     """
     Check for missing or null values in ECG signal data for each patient.
@@ -14,8 +14,7 @@ def check_for_missing_values(patient_data):
         dict: A dictionary containing patient IDs as keys and lists of indices of entries
               with missing values. If no missing values are found, it returns an empty dict.
     """
-    import numpy as np
-    from collections import defaultdict
+
 
     missing_values_report = defaultdict(list)
 
@@ -143,14 +142,14 @@ def test_signal(signal):
 
 ## FILTERS YAY
 
-def apply_high_pass_filter(signal, cutoff=0.5, fs=360, order=4, padlen=10):
+def apply_high_pass_filter(signal, cutoff=0.5, fs=250, order=4, padlen=10):
     """
     Apply a high-pass filter to remove low-frequency noise such as baseline wander.
 
     Args:
         signal (np.array): ECG signal, expected to be 1D (samples) or 2D (samples, leads).
         cutoff (float): Cutoff frequency in Hz, default is 0.5 Hz.
-        fs (int): Sampling frequency of the ECG signal in Hz, default is 360 Hz.
+        fs (int): Sampling frequency of the ECG signal in Hz, default is 250 Hz.
         order (int): The order of the filter, default is 4.
         padlen (int): The padding length used by `filtfilt` to reduce edge effects, default is 10.
 
@@ -174,14 +173,14 @@ def apply_high_pass_filter(signal, cutoff=0.5, fs=360, order=4, padlen=10):
 
 ##
 
-def apply_notch_filter(signal, notch_freq=60, fs=360, quality_factor=30):
+def apply_notch_filter(signal, notch_freq=60, fs=250, quality_factor=30):
     """
     Apply a notch filter to remove powerline interference at a specified frequency.
 
     Args:
         signal (np.array): ECG signal, expected to be 1D (samples) or 2D (samples, leads).
         notch_freq (float): Frequency to be notched out (e.g., 50 or 60 Hz), default is 60 Hz.
-        fs (int): Sampling frequency of the ECG signal in Hz, default is 360 Hz.
+        fs (int): Sampling frequency of the ECG signal in Hz, default is 250 Hz.
         quality_factor (float): Quality factor of the notch filter, default is 30.
                                A higher quality factor gives a narrower notch.
 
@@ -205,14 +204,14 @@ def apply_notch_filter(signal, notch_freq=60, fs=360, quality_factor=30):
 
 ##
 
-def apply_low_pass_filter(signal, cutoff=40, fs=360, order=4):
+def apply_low_pass_filter(signal, cutoff=40, fs=250, order=4):
     """
     Apply a low-pass filter to remove high-frequency noise from the ECG signal.
 
     Args:
         signal (np.array): ECG signal, expected to be 1D (samples) or 2D (samples, leads).
         cutoff (float): Cutoff frequency in Hz, default is 40 Hz.
-        fs (int): Sampling frequency of the ECG signal in Hz, default is 360 Hz.
+        fs (int): Sampling frequency of the ECG signal in Hz, default is 250 Hz.
         order (int): The order of the filter, default is 4.
 
     Returns:
@@ -301,53 +300,96 @@ def normalize_signal_0_to_1(signal):
 
 ##
 
-def apply_filters_and_normalization(patient_data, fs=360):
+def preprocess_patient_data(patient_data, fs=250):
     """
-    Apply high-pass, notch, low-pass, moving average filters, and normalization to each lead
-    in each beat for all patients in patient_data, with progress updates.
+    Preprocess patient data by aggregating signals and applying filters, without reassembling.
 
     Args:
-        patient_data (dict): Dictionary containing ECG data for all patients.
-        fs (int): Sampling frequency of the ECG signals, default is 360 Hz.
+        patient_data (dict): Dictionary containing patient signal data.
+        fs (int): Sampling frequency of the ECG signals, default is 250 Hz.
 
     Returns:
-        dict: Processed patient_data with filtered and normalized signals.
+        dict: Aggregated and preprocessed signals with labels, ready for segmentation.
     """
-    # Define filter parameters
-    high_pass_cutoff = 0.5   # Hz, for removing baseline wander
-    notch_freq = 60          # Hz, for removing powerline interference
-    low_pass_cutoff = 40     # Hz, for removing high-frequency noise
-    moving_average_window = 5 # Window size for smoothing
-    
-    for patient_id, beats in patient_data.items():
-        for beat in beats:
-            for lead_key in beat.keys():
-                if lead_key.startswith('signal_lead_'):
-                    # Apply high-pass filter
-                    beat[lead_key] = apply_high_pass_filter(
-                        beat[lead_key], cutoff=high_pass_cutoff, fs=fs
-                    )
-                    
-                    # Apply notch filter
-                    beat[lead_key] = apply_notch_filter(
-                        beat[lead_key], notch_freq=notch_freq, fs=fs
-                    )
-                    
-                    # Apply low-pass filter
-                    beat[lead_key] = apply_low_pass_filter(
-                        beat[lead_key], cutoff=low_pass_cutoff, fs=fs
-                    )
-                    
-                    # Apply moving average filter
-                    beat[lead_key] = apply_moving_average_filter(
-                        beat[lead_key], window_size=moving_average_window
-                    )
-                    
-                    # Apply normalization to 0-1 range
-                    beat[lead_key] = normalize_signal_0_to_1(beat[lead_key])
-        
-        # Print a progress update for each patient
-        print(f"Processing complete for patient {patient_id}")
-    
-    return patient_data
+    # Aggregate signals into arrays
+    aggregated_data = aggregate_signals(patient_data)
+
+    # Process signals
+    processed_data = {}
+    for patient_id, data in aggregated_data.items():
+        signals_lead_1 = apply_high_pass_filter(data['signals_lead_1'], cutoff=0.5, fs=fs)
+        signals_lead_1 = apply_notch_filter(signals_lead_1, notch_freq=60, fs=fs)
+        signals_lead_1 = apply_low_pass_filter(signals_lead_1, cutoff=40, fs=fs)
+        signals_lead_1 = normalize_signal_0_to_1(signals_lead_1)
+
+        signals_lead_2 = apply_high_pass_filter(data['signals_lead_2'], cutoff=0.5, fs=fs)
+        signals_lead_2 = apply_notch_filter(data['signals_lead_2'], notch_freq=60, fs=fs)
+        signals_lead_2 = apply_low_pass_filter(data['signals_lead_2'], cutoff=40, fs=fs)
+        signals_lead_2 = normalize_signal_0_to_1(signals_lead_2)
+
+        # Store processed signals and labels
+        processed_data[patient_id] = {
+            'signals_lead_1': signals_lead_1,
+            'signals_lead_2': signals_lead_2,
+            'labels': data['labels'],
+        }
+
+    return processed_data
+
 ##
+def reassemble_patient_data(aggregated_data, processed_data):
+    """
+    Reassemble processed signals back into the original patient data format.
+
+    Args:
+        aggregated_data (dict): Original aggregated signals and labels.
+        processed_data (dict): Processed signals for each patient.
+
+    Returns:
+        dict: Patient data dictionary with processed signals.
+    """
+    patient_data = {}
+
+    for patient_id, data in aggregated_data.items():
+        signals_lead_1 = processed_data[patient_id]['signals_lead_1']
+        signals_lead_2 = processed_data[patient_id]['signals_lead_2']
+        labels = data['labels']
+
+        entries = []
+        for idx, label in enumerate(labels):
+            entries.append({
+                'label': label,
+                'signal_lead_1': signals_lead_1[idx],
+                'signal_lead_2': signals_lead_2[idx],
+            })
+
+        patient_data[patient_id] = entries
+
+    return patient_data
+
+## 
+def aggregate_signals(patient_data):
+    """
+    Aggregate signals and labels from patient data into arrays for preprocessing.
+
+    Args:
+        patient_data (dict): Dictionary containing patient signal data.
+
+    Returns:
+        dict: A dictionary with keys for leads and labels containing aggregated arrays.
+    """
+    aggregated_data = {}
+    
+    for patient_id, entries in patient_data.items():
+        # Aggregate signal values for each lead
+        signals_lead_1 = np.array([entry['signal_lead_1'] for entry in entries])
+        signals_lead_2 = np.array([entry['signal_lead_2'] for entry in entries])
+        labels = [entry['label'] for entry in entries]
+
+        aggregated_data[patient_id] = { 
+            'signals_lead_1': signals_lead_1,
+            'signals_lead_2': signals_lead_2,
+            'labels': labels,
+        }
+
+    return aggregated_data
