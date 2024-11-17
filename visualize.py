@@ -175,3 +175,47 @@ def summarize_rhythm_counts(patient_data, patient_id):
     # Print the summary table
     print(f"\nSummary of Rhythm Counts for Patient {patient_id}:\n")
     print(df.to_string(index=False))
+
+
+## 
+def visualize_ecgV3(patient_data, patient_id, num_entries=10):
+    """
+    Visualize ECG signal segments for a specific patient.
+
+    Parameters:
+        patient_data (dict): Dictionary containing ECG data for all patients.
+        patient_id (str): ID of the patient to visualize.
+        num_entries (int): Number of entries (segments) to visualize.
+    
+    Returns:
+        None
+    """
+    # Check if the patient exists in the data
+    if patient_id not in patient_data:
+        print(f"Patient ID {patient_id} not found in data.")
+        return
+
+    entries = patient_data[patient_id]
+
+    # Limit the number of entries to visualize
+    num_entries = min(num_entries, len(entries))
+
+    # Create a figure with subplots
+    fig, axes = plt.subplots(num_entries, 1, figsize=(12, 4 * num_entries), sharex=True)
+
+    # Iterate over the entries to plot their signal segments
+    for i in range(num_entries):
+        entry = entries[i]
+        ax = axes[i] if num_entries > 1 else axes  # Support single subplot case
+
+        for lead_key in [key for key in entry.keys() if key.startswith("signal_lead_")]:
+            ax.plot(entry[lead_key], label=lead_key)
+
+        ax.set_title(f"Entry {i+1} - Label: {entry['label']}")
+        ax.set_ylabel("Amplitude")
+        ax.legend()
+
+    plt.xlabel("Samples")
+    plt.suptitle(f"ECG Visualization for Patient {patient_id} - First {num_entries} Entries", y=1.02, fontsize=14)
+    plt.tight_layout()
+    plt.show()
