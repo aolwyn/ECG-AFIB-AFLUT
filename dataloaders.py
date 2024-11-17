@@ -16,7 +16,10 @@ LABEL_MAPPING = {
     'AFL': 'atrial_flutter',
     'AFIB)': 'atrial_fibrillation',
     'AFL)': 'atrial_flutter',
-    # Add other relevant mappings if needed
+    '(B' : 'ventricular_bigeminy',
+    'B' : 'ventricular_bigeminy'
+
+    # Add other relevant mappings if needed <-- added redundant cases incase it for some reason wasn't working
 }
 
 ##
@@ -162,10 +165,12 @@ def get_labels(annotation):
 
 ##
 
+from wfdb import processing
+
 def load_all_records(data_dir):
     """
     Load ECG data and annotations for all records in the given directory,
-    assigning a rhythm label to every sample or segment.
+    applying downsampling to the target sampling frequency.
 
     Parameters:
         data_dir (str): Directory containing MIT-BIH ECG records (.dat files).
@@ -183,31 +188,37 @@ def load_all_records(data_dir):
             # Load ECG signal and annotations
             record, annotation = load_ecg_data(record_path)
             signal = record.p_signal  # ECG signal (2D array: samples x channels)
+            original_fs = int(record.fs)  # Original sampling frequency
             num_leads = signal.shape[1]  # Get the number of leads dynamically
+            
+            # Apply downsampling to both signal and annotations
+            downsampled_signal, downsampled_annotation = processing.resample_multichan(
+                signal, 
+                annotation, 
+                fs = original_fs, 
+                fs_target=250  
+            )
             
             # Rhythm label propagation logic
             current_label = "Other"  # Default label
             labels = []  # Store 1:1 rhythm labels
-
-            annotation_samples = annotation.sample
-            aux_notes = annotation.aux_note
             start_idx = 0
 
-            for i in range(len(annotation_samples)):
+            for i, aux in enumerate(downsampled_annotation.aux_note):
                 # Clean the auxiliary note
-                cleaned_aux = aux_notes[i].rstrip('\x00')
+                cleaned_aux = aux.rstrip('\x00')
 
                 # If a new rhythm label is detected, update the current label
                 if cleaned_aux in LABEL_MAPPING:
                     current_label = LABEL_MAPPING[cleaned_aux]
                 
                 # Determine the range for this label
-                end_idx = annotation_samples[i]
+                end_idx = downsampled_annotation.sample[i]
                 labels.extend([current_label] * (end_idx - start_idx))
                 start_idx = end_idx
             
             # Handle remaining samples
-            labels.extend([current_label] * (len(signal) - start_idx))
+            labels.extend([current_label] * (len(downsampled_signal) - start_idx))
 
             # Get patient ID from filename
             patient_id = filename.split('.')[0]
@@ -222,10 +233,10 @@ def load_all_records(data_dir):
 
                 # Add signal segments for each lead
                 for lead_index in range(num_leads):
-                    entry[f'signal_lead_{lead_index+1}'] = signal[idx, lead_index]
+                    entry[f'signal_lead_{lead_index+1}'] = downsampled_signal[idx, lead_index]
 
                 # Append the entry to the patient's data
                 all_data[patient_id].append(entry)
-            print("completed pt #"+record_path)
+            print("done patient: "+record_path)
     
     return all_data

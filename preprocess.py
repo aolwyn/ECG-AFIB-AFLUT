@@ -1,46 +1,43 @@
 import numpy as np
 from scipy.signal import butter, filtfilt, iirnotch
 
-def check_for_missing_values(signal_data):
+def check_for_missing_values(patient_data):
     """
     Check for missing or null values in ECG signal data for each patient.
-    
-    Args:
-        signal_data (dict): A dictionary where each key is a patient ID, and each value is
-                            a list of beat entries. Each beat entry is a dictionary with
-                            labels and signal segments for each lead.
-    
+
+    Parameters:
+        patient_data (dict): Dictionary where each key is a patient ID, and each value is
+                             a list of rhythm entries. Each rhythm entry contains 'label'
+                             and signal segments for each lead.
+
     Returns:
-        dict: A dictionary containing patient IDs as keys and lists of indices of beats
-              with missing values as values. If no missing values are found, it returns an empty dict.
+        dict: A dictionary containing patient IDs as keys and lists of indices of entries
+              with missing values. If no missing values are found, it returns an empty dict.
     """
-    missing_values_report = {}
+    import numpy as np
+    from collections import defaultdict
 
-    # Loop through each patient in the signal data
-    for patient_id, beats in signal_data.items():
-        missing_beats = []  # Track indices of beats with missing values for this patient
-        
-        # Loop through each beat in the patient's data
-        for i, beat_entry in enumerate(beats):
-            for lead, segment in beat_entry.items():
-                if lead.startswith("signal_lead"):  # Only check signal leads
-                    # Check if there are any NaN values in the segment
-                    if np.isnan(segment).any():
-                        missing_beats.append(i)
-                        break  # Stop checking other leads for this beat if NaN is found
+    missing_values_report = defaultdict(list)
 
-        # Add to report if any missing values are found for this patient
-        if missing_beats:
-            missing_values_report[patient_id] = missing_beats
-
+    # Loop through each patient in the data
+    for patient_id, entries in patient_data.items():
+        # Check each entry for missing values
+        for i, entry in enumerate(entries):
+            for key, value in entry.items():
+                if key.startswith("signal_lead_"):  # Check only signal leads
+                    if np.isnan(value).any():  # Check for NaN values in the signal
+                        missing_values_report[patient_id].append(i)
+                        break  # No need to check other leads for this entry
+        print("completed patient #"+patient_id)                    
+    # Print a summary of the missing values
     if missing_values_report:
-        print("Missing values found in the following patients and beats:")
-        for patient_id, beat_indices in missing_values_report.items():
-            print(f"Patient {patient_id}: Beats with missing values at indices {beat_indices}")
+        print("Missing values found in the following patients and entries:")
+        for patient_id, entry_indices in missing_values_report.items():
+            print(f"Patient {patient_id}: Entries with missing values at indices {entry_indices}")
     else:
         print("No missing values found in any patient records.")
 
-    return missing_values_report
+    return dict(missing_values_report)
 
 ##
 
@@ -88,43 +85,47 @@ def check_segment_lengths(signal_data, target_length):
 
 ##
 
-def calculate_rr_intervals(signal_data, fs=360):
+def calculate_rr_intervals(patient_data, fs=250):
     """
-    Calculate the R-R (peak-to-peak) intervals between consecutive beats for each patient.
-    
-    Args:
-        signal_data (dict): A dictionary where each key is a patient ID, and each value is
-                            a list of beat entries. Each beat entry is a dictionary with
-                            labels and signal segments for each lead.
-        fs (int): Sampling frequency of the ECG signals in Hz (default is 360).
-    
+    Calculate the R-R (peak-to-peak) intervals between consecutive rhythm segments for each patient.
+
+    Parameters:
+        patient_data (dict): Dictionary where each key is a patient ID, and each value is
+                             a list of rhythm entries. Each rhythm entry contains a label
+                             and signal segments for each lead.
+        fs (int): Sampling frequency of the ECG signals in Hz (default is 250 Hz).
+
     Returns:
         dict: A dictionary with patient IDs as keys and lists of R-R intervals (in seconds)
-              for each consecutive beat.
+              for consecutive rhythm segments.
     """
     rr_intervals = {}
 
-    # Iterate over each patient in the signal data
-    for patient_id, beats in signal_data.items():
+    # Iterate over each patient's data
+    for patient_id, entries in patient_data.items():
         patient_rr_intervals = []
-        
-        # Loop through beats and calculate intervals between consecutive R-peaks
-        for i in range(1, len(beats)):
-            # Assuming each segment is centered on an R-peak, calculate interval in samples
-            # Get the sample index for the R-peak in each consecutive segment
-            # Here, you assume that each segment represents one R-peak
-            r_peak_interval_samples = fs  # Time between segments if each segment represents an R-peak
-            
-            # Convert to time in seconds
-            r_peak_interval_seconds = r_peak_interval_samples / fs
-            
-            # Append the interval in seconds
-            patient_rr_intervals.append(r_peak_interval_seconds)
-        
-        # Store R-R intervals for this patient
+
+        # Extract R-R intervals between consecutive rhythm segments
+        for i in range(1, len(entries)):
+            # Check if the signal_lead_1 value is an array
+            signal_segment = entries[i - 1]["signal_lead_1"]
+            if isinstance(signal_segment, (np.ndarray, list)):
+                # Calculate the R-R interval in samples
+                r_peak_interval_samples = len(signal_segment)  # Use the length of the previous segment
+                # Convert interval from samples to seconds
+                r_peak_interval_seconds = r_peak_interval_samples / fs
+                # Append to the list of R-R intervals for this patient
+                patient_rr_intervals.append(r_peak_interval_seconds)
+            else:
+                print(f"Warning: Unexpected format for signal_lead_1 in patient {patient_id}, entry {i-1}")
+                continue
+
+        # Store the patient's R-R intervals
         rr_intervals[patient_id] = patient_rr_intervals
 
     return rr_intervals
+
+
 
 ## Test Signal
 
