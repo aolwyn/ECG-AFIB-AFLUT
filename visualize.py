@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from dataloaders import load_record 
 from scipy.signal import decimate
+from collections import Counter
+import pandas as pd
 
 def visualize_ecg_with_labels(signal, annotations, fs=250, duration=10):
     """
@@ -142,3 +144,34 @@ def visualize_ecg(patient_data, patient_id, num_beats=5):
     
     plt.tight_layout()
     plt.show()
+
+##
+def summarize_rhythm_counts(patient_data, patient_id):
+    """
+    Summarize the number of beats of each rhythm type for a given patient.
+
+    Parameters:
+        patient_data (dict): Dictionary containing ECG data for all patients.
+        patient_id (str): ID of the patient to summarize.
+
+    Returns:
+        None: Prints a table summarizing the counts of beats for each rhythm type.
+    """
+    # Check if patient exists in the dataset
+    if patient_id not in patient_data:
+        print(f"Patient ID {patient_id} not found in the dataset.")
+        return
+
+    # Extract rhythm labels for the patient
+    rhythm_labels = [entry['label'] for entry in patient_data[patient_id]]
+
+    # Count occurrences of each rhythm type
+    rhythm_counts = Counter(rhythm_labels)
+
+    # Create a DataFrame for better visualization
+    df = pd.DataFrame(list(rhythm_counts.items()), columns=["Rhythm Type", "Count"])
+    df.sort_values(by="Count", ascending=False, inplace=True)
+
+    # Print the summary table
+    print(f"\nSummary of Rhythm Counts for Patient {patient_id}:\n")
+    print(df.to_string(index=False))

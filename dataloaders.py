@@ -8,9 +8,14 @@ import matplotlib.pyplot as plt
 
 # Define a dictionary for mapping MIT-BIH annotations to classes
 LABEL_MAPPING = {
-    '(N': 'normal',  # Normal beat
+    '(N': 'normal',  
+    'N': 'normal',
     '(AFIB': 'atrial_fibrillation',
     '(AFL': 'atrial_flutter',
+    'AFIB': 'atrial_fibrillation',
+    'AFL': 'atrial_flutter',
+    'AFIB)': 'atrial_fibrillation',
+    'AFL)': 'atrial_flutter',
     # Add other relevant mappings if needed
 }
 
@@ -109,15 +114,16 @@ def load_ecg_data(record_path):
 ##
 
 def get_labels(annotation):
-    """
-    Convert annotation symbols to class labels based on LABEL_MAPPING.
+    # """
+    # Convert annotation symbols to class labels based on LABEL_MAPPING.
     
-    Parameters:
-        annotation (wfdb.Annotation): Annotation object containing beat labels.
+    # Parameters:
+    #     annotation (wfdb.Annotation): Annotation object containing beat labels.
     
-    Returns:
-        list: List of labels mapped from annotation symbols.
-    """
+    # Returns:
+    #     list: List of labels mapped from annotation symbols.
+    # """
+    #NOTE: below is for beat level. 
     # labels = []
     # for symbol in annotation.symbol:
     #     if symbol in LABEL_MAPPING:
@@ -135,34 +141,38 @@ def get_labels(annotation):
         annotation (wfdb.Annotation): Annotation object containing beat and rhythm annotations.
     
     Returns:
-        list: List of cleaned rhythm types found in aux_note, or 'Unknown' if no rhythm information.
+        list: List of cleaned rhythm types found in aux_note, or 'Other' if no rhythm information.
     """
-    rhythms = []
+    #NOTE: BELOW RETURNS THE RHYTHM BASED LABELS. 
+    labels = []
+    current_label = "Other"  # Default label
+
     for aux in annotation.aux_note:
-        # Remove the last character if it's a null or unwanted character
-        cleaned_aux = aux.rstrip('\x00')  # Remove null character or any trailing whitespace
-        
+        # Remove any trailing null or unwanted characters
+        cleaned_aux = aux.rstrip('\x00')
+
+        # Check if the cleaned annotation is a valid rhythm label
         if cleaned_aux in LABEL_MAPPING:
-            rhythms.append(LABEL_MAPPING[cleaned_aux])
-        else:  # If there is a cleaned aux_note and it's not mapped
-            rhythms.append('Other')  # Append 'Other' for unmapped rhythm types
-    return rhythms
+            current_label = LABEL_MAPPING[cleaned_aux]  # Update the current label
+        # Append the current label (propagate it forward)
+        labels.append(current_label)
+
+    return labels
 
 
 ##
 
 def load_all_records(data_dir):
     """
-    Load ECG data and annotations for all records in the given directory and 
-    compile them into a nested dictionary.
-    
+    Load ECG data and annotations for all records in the given directory,
+    assigning a rhythm label to every sample or segment.
+
     Parameters:
         data_dir (str): Directory containing MIT-BIH ECG records (.dat files).
     
     Returns:
         dict: A dictionary with patient IDs as keys, and each value is a list
-              of beat entries. Each beat entry is a dictionary containing label
-              and signal segments for each lead.
+              of entries where each entry has a 1:1 mapping to rhythm labels.
     """
     all_data = {}
 
@@ -175,35 +185,47 @@ def load_all_records(data_dir):
             signal = record.p_signal  # ECG signal (2D array: samples x channels)
             num_leads = signal.shape[1]  # Get the number of leads dynamically
             
-            # Get labels for each beat
-            labels = get_labels(annotation)
+            # Rhythm label propagation logic
+            current_label = "Other"  # Default label
+            labels = []  # Store 1:1 rhythm labels
+
+            annotation_samples = annotation.sample
+            aux_notes = annotation.aux_note
+            start_idx = 0
+
+            for i in range(len(annotation_samples)):
+                # Clean the auxiliary note
+                cleaned_aux = aux_notes[i].rstrip('\x00')
+
+                # If a new rhythm label is detected, update the current label
+                if cleaned_aux in LABEL_MAPPING:
+                    current_label = LABEL_MAPPING[cleaned_aux]
+                
+                # Determine the range for this label
+                end_idx = annotation_samples[i]
+                labels.extend([current_label] * (end_idx - start_idx))
+                start_idx = end_idx
             
+            # Handle remaining samples
+            labels.extend([current_label] * (len(signal) - start_idx))
+
             # Get patient ID from filename
             patient_id = filename.split('.')[0]
             
             # Initialize patient data if not already present
             if patient_id not in all_data:
                 all_data[patient_id] = []
-            
-            # Process each beat in the annotation. 
-            #NOTE this line makes it so it only loads in what's in the LABEL_MAPPING dictionary
-            for i, label in enumerate(labels):
-                if label == 'other':  # Ignore irrelevant labels
-                    continue
-                
-                # Extract segments around each beat for each lead
-                start = max(0, annotation.sample[i] - 90)  # Adjust based on sampling rate
-                end = min(len(signal), annotation.sample[i] + 90)
-                
-                # Prepare a dictionary for this beat entry
-                beat_entry = {'label': label}
-                
-                # Add signal segment for each lead
+
+            # Create 1:1 mapping for every segment
+            for idx, label in enumerate(labels):
+                entry = {'label': label}
+
+                # Add signal segments for each lead
                 for lead_index in range(num_leads):
-                    segment = signal[start:end, lead_index]  # Segment for current lead
-                    beat_entry[f'signal_lead_{lead_index+1}'] = segment
-                
-                # Append this beat entry to the patient's data
-                all_data[patient_id].append(beat_entry)
+                    entry[f'signal_lead_{lead_index+1}'] = signal[idx, lead_index]
+
+                # Append the entry to the patient's data
+                all_data[patient_id].append(entry)
+            print("completed pt #"+record_path)
     
     return all_data
