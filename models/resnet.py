@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 
-class BasicBlock1D(nn.Module):
+class ResNetBlock1D(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=7, stride=1, downsample=None):
-        super(BasicBlock1D, self).__init__()
+        super(ResNetBlock1D, self).__init__()
         self.conv1 = nn.Conv1d(in_channels, out_channels, kernel_size, stride, padding=kernel_size//2)
         self.bn1 = nn.BatchNorm1d(out_channels)
         self.relu = nn.ReLU(inplace=True)
@@ -29,9 +29,9 @@ class ResNet1D(nn.Module):
     requires_reshape = True  # Add this to indicate reshaping is needed
     def __init__(self, input_channels=1, num_classes=5):
         super(ResNet1D, self).__init__()
-        self.layer1 = BasicBlock1D(input_channels, 16)
-        self.layer2 = BasicBlock1D(16, 32)
-        self.layer3 = BasicBlock1D(32, 64)
+        self.layer1 = ResNetBlock1D(input_channels, 16)
+        self.layer2 = ResNetBlock1D(16, 32)
+        self.layer3 = ResNetBlock1D(32, 64)
         self.global_avg_pool = nn.AdaptiveAvgPool1d(1)
         self.fc = nn.Linear(64, num_classes)
 
