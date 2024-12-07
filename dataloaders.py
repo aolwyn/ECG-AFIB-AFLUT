@@ -247,8 +247,9 @@ class ECGDataset(Dataset):
     PyTorch Dataset for ECG data.
     """
     def __init__(self, signals, labels):
-        self.signals = torch.tensor(signals, dtype=torch.float32)
+        self.signals = torch.tensor(signals, dtype=torch.float32).unsqueeze(-1)
         self.labels = torch.tensor(labels, dtype=torch.long)
+        # self.signals = torch.tensor(signals, dtype=torch.float32) # <--- forgot to adjust input shape because we're 1:1 timestep to feature
 
     def __len__(self):
         return len(self.signals)
