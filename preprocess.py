@@ -1,6 +1,9 @@
 import numpy as np
 from scipy.signal import butter, filtfilt, iirnotch
 from collections import defaultdict
+
+import pywt 
+
 def check_for_missing_values(patient_data):
     """
     Check for missing or null values in ECG signal data for each patient.
@@ -129,6 +132,16 @@ def calculate_rr_intervals(patient_data, fs=250):
 ## Test Signal
 
 def test_signal(signal):
+    '''
+    Test a signal for EDA.
+
+    Parameters: 
+        signal((np.array): ECG signal, expected to be 1D (samples) or 2D (samples, leads).
+    
+    Returns:
+        np.array: Filtered ECG signal that's -1 1 normalized
+    
+    '''
     # test normalization between -1 and 1.
     min_val, max_val = signal.min(), signal.max()
     # print("lowest value:",min_val)
@@ -300,6 +313,48 @@ def normalize_signal_0_to_1(signal):
 
 ##
 
+def universal_threshold(coeff, length):
+    """Calculate universal threshold based on the median of detail coefficients."""
+    # @NOTE SEE CITED THINGS FOR THE VALUES WE USE
+
+    median_val = np.median(np.abs(coeff))
+    threshold = (median_val / 0.6745) * np.sqrt(2 * np.log(length))
+    return pywt.threshold(coeff, threshold, mode='soft')
+
+def apply_wavelet_denoising(signal, wavelet='db4', level=5):
+    """Apply wavelet denoising to an input ECG signal.
+    
+    Args:
+        signal (np.array): ECG signal, expected to be 1D (samples) or 2D (samples, leads).
+        wavelet (str): Type of wavelet to use, default is 'db4'.
+        level (int): Decomposition level, default is 5.
+
+    Returns:
+        np.array: Denoised ECG signal with the same shape as input.
+
+    Notes:
+        Decomposition levels of 3, 4, and 6 were tested. Level 5 provided the best balance 
+        between noise reduction and signal preservation based on empirical evaluation.
+    """
+    if signal.ndim == 1:
+        # Process single-lead signal
+        coeffs = pywt.wavedec(signal, wavelet, level=level)
+        thresholded_coeffs = [coeffs[0]] + [universal_threshold(c, len(signal)) for c in coeffs[1:]]
+        denoised_signal = pywt.waverec(thresholded_coeffs, wavelet)
+        return denoised_signal
+
+    elif signal.ndim == 2:
+        # Process multi-lead signal
+        denoised_signal = np.zeros_like(signal)
+        for lead in range(signal.shape[1]):
+            coeffs = pywt.wavedec(signal[:, lead], wavelet, level=level)
+            thresholded_coeffs = [coeffs[0]] + [universal_threshold(c, len(signal[:, lead])) for c in coeffs[1:]]
+            denoised_signal[:, lead] = pywt.waverec(thresholded_coeffs, wavelet)
+        return denoised_signal
+
+    else:
+        raise ValueError("Invalid signal shape. Expected 1D or 2D array.") # only have access to 2 leads from the database for the most part, any others we can disregard. see dataset info for more on why we can do this
+
 def preprocess_patient_data(patient_data, fs=250):
     """
     Preprocess patient data by aggregating signals and applying filters, without reassembling.
@@ -314,7 +369,7 @@ def preprocess_patient_data(patient_data, fs=250):
     # Aggregate signals into arrays
     aggregated_data = aggregate_signals(patient_data)
 
-    # Process signals
+    # Process signals, below is for method 1 of preproc.
     processed_data = {}
     for patient_id, data in aggregated_data.items():
         signals_lead_1 = apply_high_pass_filter(data['signals_lead_1'], cutoff=0.5, fs=fs)
@@ -326,6 +381,10 @@ def preprocess_patient_data(patient_data, fs=250):
         signals_lead_2 = apply_notch_filter(data['signals_lead_2'], notch_freq=60, fs=fs)
         signals_lead_2 = apply_low_pass_filter(data['signals_lead_2'], cutoff=40, fs=fs)
         signals_lead_2 = normalize_signal_0_to_1(signals_lead_2)
+
+        # If testing method 2, use below. 
+        # signals_lead_1 = apply_wavelet_denoising(data['signals_lead_1'])
+        # signals_lead_2 = apply_wavelet_denoising(data['signals_lead_2'])
 
         # Store processed signals and labels
         processed_data[patient_id] = {
