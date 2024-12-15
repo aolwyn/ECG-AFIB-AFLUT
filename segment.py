@@ -167,3 +167,38 @@ def prepare_rnn_data(signal, labels, segment_length_sec, fs=250):
     # Convert to numpy arrays
     return np.array(segmented_signals), np.array(segmented_labels)
 
+def apply_smote(data_by_label, target_counts, original_shape, random_state=42):
+    """
+    Augments data using SMOTE for specified target counts.
+
+    Args:
+        data_by_label (dict): Dictionary where keys are labels and values are lists of signals.
+        target_counts (dict): Target counts for labels to be augmented using SMOTE.
+        original_shape (tuple): Original shape of the signals (e.g., (length, features)).
+        random_state (int): Random seed for reproducibility.
+
+    Returns:
+        np.ndarray, np.ndarray: Augmented signals and their corresponding labels.
+    """
+    # Prepare data for SMOTE
+    X_minority = []
+    y_minority = []
+    for label, data in data_by_label.items():
+        if label in target_counts:
+            X_minority.extend(data)
+            y_minority.extend([label] * len(data))
+    X_minority = np.array(X_minority)
+    y_minority = np.array(y_minority)
+    
+    # Flatten signals for SMOTE
+    X_minority_flat = X_minority.reshape(X_minority.shape[0], -1)
+    
+    # Apply SMOTE
+    smote = SMOTE(sampling_strategy=target_counts, random_state=random_state)
+    X_resampled, y_resampled = smote.fit_resample(X_minority_flat, y_minority)
+    
+    # Reshape signals back to original dimensions
+    X_resampled = X_resampled.reshape(-1, *original_shape)
+    
+    return X_resampled, y_resampled
+
