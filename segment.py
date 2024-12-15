@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from collections import Counter
+from imblearn.over_sampling import SMOTE
 
 # def segment_ecg_data(ecg_data, snippet_length=200, samples_before=90, samples_after=90):
 #     """
