@@ -10,7 +10,7 @@ class ECG_RNN(nn.Module):
         self.fc = nn.Linear(hidden_size, num_classes)
 
     def forward(self, x):
-        out, _ = self.rnn(x)  # Expected shape: [batch_size, seq_len, input_size]
-        out = out[:, -1, :]   # Take the last hidden state
+        out, _ = self.rnn(x)  # Expected shape: [batch_size, seq_len, input_size] <-- debug print into main, need reshape
+        out = out[:, -1, :]   
         out = self.fc(out)
         return out

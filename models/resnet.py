@@ -26,7 +26,7 @@ class ResNetBlock1D(nn.Module):
 
 
 class ResNet1D(nn.Module):
-    requires_reshape = True  # Add this to indicate reshaping is needed
+    requires_reshape = True  # NOTE this is needed, double check the other models as well 
     def __init__(self, input_channels=1, num_classes=5):
         super(ResNet1D, self).__init__()
         self.layer1 = ResNetBlock1D(input_channels, 16)

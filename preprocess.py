@@ -18,7 +18,6 @@ def check_for_missing_values(patient_data):
               with missing values. If no missing values are found, it returns an empty dict.
     """
 
-
     missing_values_report = defaultdict(list)
 
     # Loop through each patient in the data
@@ -373,13 +372,13 @@ def preprocess_patient_data(patient_data, fs=250):
     processed_data = {}
     for patient_id, data in aggregated_data.items():
         signals_lead_1 = apply_high_pass_filter(data['signals_lead_1'], cutoff=0.5, fs=fs)
-        signals_lead_1 = apply_notch_filter(signals_lead_1, notch_freq=60, fs=fs)
         signals_lead_1 = apply_low_pass_filter(signals_lead_1, cutoff=40, fs=fs)
+        signals_lead_1 = apply_notch_filter(signals_lead_1, notch_freq=60, fs=fs)
         signals_lead_1 = normalize_signal_0_to_1(signals_lead_1)
 
         signals_lead_2 = apply_high_pass_filter(data['signals_lead_2'], cutoff=0.5, fs=fs)
-        signals_lead_2 = apply_notch_filter(data['signals_lead_2'], notch_freq=60, fs=fs)
-        signals_lead_2 = apply_low_pass_filter(data['signals_lead_2'], cutoff=40, fs=fs)
+        signals_lead_2 = apply_low_pass_filter(signals_lead_2, cutoff=40, fs=fs)
+        signals_lead_2 = apply_notch_filter(signals_lead_2, notch_freq=60, fs=fs)
         signals_lead_2 = normalize_signal_0_to_1(signals_lead_2)
 
         # If testing method 2, use below. 

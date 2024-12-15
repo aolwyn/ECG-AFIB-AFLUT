@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
+from collections import Counter
 
 # def segment_ecg_data(ecg_data, snippet_length=200, samples_before=90, samples_after=90):
 #     """
@@ -131,6 +132,13 @@ def prepare_rnn_data(signal, labels, segment_length_sec, fs=250):
     segment_length_samples = segment_length_sec * fs
     segmented_signals = []
     segmented_labels = []
+    # # Print TOTAL counts of labels across all patients
+    # print("========== DEBUG: LABEL SUMMARY ==========")
+    # total_label_counts = Counter(labels)
+    # # total_labels_sum = sum(total_label_counts.values())
+    # for label, count in total_label_counts.items():
+    #         print(f"Label: '{label}' - Count: {count}")
+    # print("========== DEBUG: LABEL SUMMARY END ==========")
 
     for start_idx in range(0, len(signal), segment_length_samples):
         end_idx = start_idx + segment_length_samples
@@ -148,6 +156,13 @@ def prepare_rnn_data(signal, labels, segment_length_sec, fs=250):
 
         segmented_signals.append(segment)
         segmented_labels.append(majority_label)
+    # print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+    # # Print label counts AFTER segmentation
+    # print("\n========== DEBUG: LABEL SUMMARY AFTER SEGMENTATION ==========")
+    # segmented_label_counts = Counter(segmented_labels)
+    # for label, count in segmented_label_counts.items():
+    #     print(f"Label: '{label}' - Count: {count}")
+    # print("========== DEBUG: LABEL SUMMARY END ==========")
 
     # Convert to numpy arrays
     return np.array(segmented_signals), np.array(segmented_labels)

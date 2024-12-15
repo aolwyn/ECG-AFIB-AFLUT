@@ -26,13 +26,16 @@ class CNNLSTM(nn.Module):
         # Fully Connected Layers
         self.fc1 = nn.Linear(64, 128)
         self.dropout = nn.Dropout(0.2)
-        self.fc2 = nn.Linear(128, 4)  # For multi-class classification (4 classes)
+        self.fc2 = nn.Linear(128, 5)  # For multi-class classification NOTE change the second thing per class outputs. 
 
         # Uncomment below for AFIB/AFLUT
         # self.fc2 = nn.Linear(128, 1)  # For binary classification
 
     def forward(self, x):
-        x = x.permute(0, 2, 1)  # (batch_size, channels, seq_len)
+        # print("############### DEBUG #############")
+        # print(x.shape[1]) <-- little bugger causing an issue, sent in the wrong dims x-x
+        if x.shape[1] != 1: 
+            x = x.permute(0, 2, 1)  # Reshape to (batch_size, channels=1, sequence_length)
         
         x = torch.relu(self.conv1(x))
         x = self.bn1(x)
