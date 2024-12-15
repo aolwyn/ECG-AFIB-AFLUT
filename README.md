@@ -1,5 +1,5 @@
 # ECG-AFIB-AFLUT
-Development of machine learning and artificial intelligence models to detect and separate atrial fibrillation and atrial flutter using ECG data.
+Development of machine learning and artificial intelligence models aimed at rhythm and beat-based detection for target classes.
 
 Disclaimer:
 
