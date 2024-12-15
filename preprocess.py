@@ -289,7 +289,7 @@ def normalize_signal_0_to_1(signal):
     Note:
         If the signal is multi-lead (2D), each lead is normalized independently.
     """
-    # Ensure signal is a NumPy array
+
     signal = np.array(signal)
     
     if signal.ndim == 1:
@@ -307,7 +307,7 @@ def normalize_signal_0_to_1(signal):
             if max_val - min_val != 0:
                 normalized_signal[:, lead] = (signal[:, lead] - min_val) / (max_val - min_val)
             else:
-                normalized_signal[:, lead] = np.zeros(signal.shape[0])  # Zero array if constant
+                normalized_signal[:, lead] = np.zeros(signal.shape[0])  
         return normalized_signal
 
 ##
